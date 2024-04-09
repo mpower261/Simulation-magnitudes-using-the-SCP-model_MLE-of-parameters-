@@ -1,0 +1,59 @@
+% Sasan Motaghed, Mohammad Mohammadi, Nasrollah Eftekhari and Mozhgan Khazaei
+% January 03, 2024
+
+% This code was developed by Mohammad Mohammadi (BKATU)
+% to estimation of SCP parameters for uncertain seismic magnitude values
+% based on maximum likelihood approach. It is meant to accompany the 
+% following paper:
+
+
+% Motaghed, S., Mohammadi, M., Eftekhari, N. and Khazaee, M.
+% SCP Parameters Estimation for Catalogs with Uncertain Seismic Magnitude Values.
+% submited to Acta Geophysica
+
+a=5.6e-08;q=1.79;n=1000;it=100
+errora=0;errorq=0
+for (i in 1:it){
+u1=runif(n,0,1)
+b1=log(1-u1)*(1-q)/(2-q)
+k1=a*(q-1)*(2-q)^((1-q)/(q-2))
+m1=log((exp(b1)-1)/k1)/(2*log(10))
+#################
+mag=m1
+m2 <- seq(3.5,max(mag)-.2,by=.1)
+Fn=ecdf(mag)
+dep=1-Fn(m)
+curve = data.frame(dep,m)
+library(minpack.lm)
+curve.nlslrc = nlsLM(dep ~ (1+a*(q-1)*(2-q)^((1-q)/(q-2))*10^(2*m))^((2-q)/(1-q)),
+                     start=list(a = 10^(-6),q = 1.5),
+                        data = curve)
+coef1=coef(curve.nlslrc)
+#initial values in optim
+a2=coef1[1];q2=coef1[2]
+#########################
+#estimating parameters
+minm=3.5
+#likelihood function without uncertainty
+extendDistr <- function(a,q,mag,log=FALSE) {
+numerator=(1+a*(q-1)*(2-q)^((1-q)/(q-2))*10^(2*mag))^(1/(1-q))*a*(2-q)^(1/(-q+2))*2*10^(2*mag)*log(10)
+denominator=-(1+a*(q-1)*(2-q)^((1-q)/(q-2))*10^(2*max(mag)))^((2-q)/(1-q))+(1+a*(q-1)*(2-q)^((1-q)/(q-2))*10^(2*minm))^((2-q)/(1-q))
+  pdf <- numerator/denominator
+if (log)
+  pdf <- log(pdf)
+ return(pdf)
+}
+nLL=function(p){
+a=p[1]
+q=p[2]
+log_ll=sum(extendDistr(a,q,mag,log=TRUE))
+return(-log_ll)
+}
+optim1=optim(c(a2,q2), nLL,method = "SANN")
+a1=optim1$par[1]
+q1=optim1$par[2]
+errora[i]=abs(a1-a)
+errorq[i]=abs(q1-q)
+}
+mean(errora^2)
+mean(errorq^2)
